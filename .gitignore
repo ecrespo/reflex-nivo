@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Reflex
+.web/
+.states/
+*.db
+assets/external/
+reflex.lock/
+.ruff_cache/
+
+# Editors / local scratch
+.idea/
+Claude outputs/
