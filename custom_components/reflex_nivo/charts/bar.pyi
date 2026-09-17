@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Bar(NivoComponent):
     @classmethod
     def create(
@@ -119,7 +122,7 @@ class Bar(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Bar":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -310,7 +313,7 @@ class BarCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "BarCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

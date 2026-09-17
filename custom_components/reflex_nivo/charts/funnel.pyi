@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Funnel(NivoComponent):
     @classmethod
     def create(
@@ -86,7 +89,7 @@ class Funnel(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Funnel":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

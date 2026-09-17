@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Line(NivoComponent):
     @classmethod
     def create(
@@ -115,7 +118,7 @@ class Line(NivoComponent):
         on_touch_start: Optional[EventType[()] | EventType[dict[str, Any]]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Line":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -291,7 +294,7 @@ class LineCanvas(NivoComponent):
         on_touch_start: Optional[EventType[()] | EventType[dict[str, Any]]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "LineCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

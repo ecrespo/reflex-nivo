@@ -213,8 +213,12 @@ customization examples.
 
 ```bash
 uv venv && uv pip install -e . && cd nivo_demo && uv pip install -r requirements.txt
-uv run reflex run   # http://localhost:3010 (backend on 8010)
+uv run reflex run   # http://localhost:3000
 ```
+
+If a tab from another Reflex app is still open on the same ports, its frontend reconnects to this
+backend and the console reports `no dispatch function for substate(s)`: close or reload that tab, or
+give one of the apps its own `frontend_port`/`backend_port`.
 
 World country shapes in the demo come from the nivo website dataset (Natural Earth).
 

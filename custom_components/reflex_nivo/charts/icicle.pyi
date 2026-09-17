@@ -12,6 +12,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Icicle(NivoComponent):
     @classmethod
     def create(
@@ -106,7 +109,7 @@ class Icicle(NivoComponent):
         on_unmount: Optional[EventType[()]] = None,
         on_wheel: Optional[EventType[()] | EventType[dict[str, Any]]] = None,
         **props,
-    ) -> "Icicle":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -294,7 +297,7 @@ class IcicleHtml(NivoComponent):
         on_unmount: Optional[EventType[()]] = None,
         on_wheel: Optional[EventType[()] | EventType[dict[str, Any]]] = None,
         **props,
-    ) -> "IcicleHtml":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

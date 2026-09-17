@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Literal
 from reflex.event import EventHandler
 from reflex.vars.base import Var
 
-from ..base import NivoComponent, nivo_event_spec
+from ..base import NivoComponent, nivo_event_spec, nivo_id_event_spec
 from ..constants import nivo_package
 
 

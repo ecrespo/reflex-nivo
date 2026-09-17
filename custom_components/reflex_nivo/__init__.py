@@ -23,7 +23,7 @@ from .constants import (
 from .helpers import *  # noqa: F403
 from .helpers import __all__ as _helpers_all
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "CATEGORICAL_COLOR_SCHEMES",

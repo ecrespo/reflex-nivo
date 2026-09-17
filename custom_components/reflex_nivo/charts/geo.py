@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Literal
 from reflex.event import EventHandler
 from reflex.vars.base import Var
 
-from ..base import NivoComponent, nivo_event_spec
+from ..base import NivoComponent, nivo_event_spec, nivo_id_event_spec
 from ..constants import nivo_package
 
 
@@ -89,9 +89,6 @@ class Choropleth(NivoComponent):
 
     # Events: the handler receives the JSON-safe first callback argument.
     on_click: EventHandler[nivo_event_spec]
-    on_mouse_enter: EventHandler[nivo_event_spec]
-    on_mouse_leave: EventHandler[nivo_event_spec]
-    on_mouse_move: EventHandler[nivo_event_spec]
 
 
 class ChoroplethCanvas(NivoComponent):
@@ -115,16 +112,12 @@ class ChoroplethCanvas(NivoComponent):
     colors: Var[Any]
     # Chart data (see the nivo docs of this chart for the expected shape). (required)
     data: Var[Any]
-    # SVG pattern/gradient definitions (see reflex_nivo.pattern_dots_def & co).
-    defs: Var[Any]
     # TS: number[] (required)
     domain: Var[Sequence[int | float]]
     # TS: boolean
     enable_graticule: Var[bool]
     # TS: any[] (required)
     features: Var[Any]
-    # Rules matching data to defs: [{'match': {'id': 'x'}, 'id': 'dots'}].
-    fill: Var[Any]
     # TS: string
     graticule_line_color: Var[str]
     # TS: number
@@ -168,8 +161,6 @@ class ChoroplethCanvas(NivoComponent):
 
     # Events: the handler receives the JSON-safe first callback argument.
     on_click: EventHandler[nivo_event_spec]
-    on_mouse_enter: EventHandler[nivo_event_spec]
-    on_mouse_leave: EventHandler[nivo_event_spec]
     on_mouse_move: EventHandler[nivo_event_spec]
 
 
@@ -190,14 +181,10 @@ class GeoMap(NivoComponent):
     border_color: Var[Any]
     # TS: number | FeatureAccessor<Feature, number>
     border_width: Var[Any]
-    # SVG pattern/gradient definitions (see reflex_nivo.pattern_dots_def & co).
-    defs: Var[Any]
     # TS: boolean
     enable_graticule: Var[bool]
     # TS: any[] (required)
     features: Var[Any]
-    # Rules matching data to defs: [{'match': {'id': 'x'}, 'id': 'dots'}].
-    fill: Var[Any]
     # TS: string | FeatureAccessor<Feature, string>
     fill_color: Var[Any]
     # TS: string
@@ -208,8 +195,6 @@ class GeoMap(NivoComponent):
     is_interactive: Var[bool]
     # Layers to render, in order (strings or custom JS layers).
     layers: Var[Any]
-    # Legends configuration (see reflex_nivo.legend()).
-    legends: Var[Any]
     # Chart margin: {'top': .., 'right': .., 'bottom': .., 'left': ..}.
     margin: Var[Any]
     # react-spring preset ('gentle', 'wobbly', ...) or a config dict.
@@ -233,9 +218,6 @@ class GeoMap(NivoComponent):
 
     # Events: the handler receives the JSON-safe first callback argument.
     on_click: EventHandler[nivo_event_spec]
-    on_mouse_enter: EventHandler[nivo_event_spec]
-    on_mouse_leave: EventHandler[nivo_event_spec]
-    on_mouse_move: EventHandler[nivo_event_spec]
 
 
 class GeoMapCanvas(NivoComponent):
@@ -256,14 +238,10 @@ class GeoMapCanvas(NivoComponent):
     border_color: Var[Any]
     # TS: number | FeatureAccessor<Feature, number>
     border_width: Var[Any]
-    # SVG pattern/gradient definitions (see reflex_nivo.pattern_dots_def & co).
-    defs: Var[Any]
     # TS: boolean
     enable_graticule: Var[bool]
     # TS: any[] (required)
     features: Var[Any]
-    # Rules matching data to defs: [{'match': {'id': 'x'}, 'id': 'dots'}].
-    fill: Var[Any]
     # TS: string | FeatureAccessor<Feature, string>
     fill_color: Var[Any]
     # TS: string
@@ -274,8 +252,6 @@ class GeoMapCanvas(NivoComponent):
     is_interactive: Var[bool]
     # Layers to render, in order (strings or custom JS layers).
     layers: Var[Any]
-    # Legends configuration (see reflex_nivo.legend()).
-    legends: Var[Any]
     # Chart margin: {'top': .., 'right': .., 'bottom': .., 'left': ..}.
     margin: Var[Any]
     # react-spring preset ('gentle', 'wobbly', ...) or a config dict.
@@ -299,8 +275,6 @@ class GeoMapCanvas(NivoComponent):
 
     # Events: the handler receives the JSON-safe first callback argument.
     on_click: EventHandler[nivo_event_spec]
-    on_mouse_enter: EventHandler[nivo_event_spec]
-    on_mouse_leave: EventHandler[nivo_event_spec]
     on_mouse_move: EventHandler[nivo_event_spec]
 
 

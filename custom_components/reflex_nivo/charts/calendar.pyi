@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Calendar(NivoComponent):
     @classmethod
     def create(
@@ -95,7 +98,7 @@ class Calendar(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Calendar":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -247,7 +250,7 @@ class CalendarCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "CalendarCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -396,7 +399,7 @@ class TimeRange(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "TimeRange":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
