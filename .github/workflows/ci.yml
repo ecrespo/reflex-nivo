@@ -68,13 +68,27 @@ jobs:
           python-version: "3.12"
 
       - name: Install build tooling
-        run: pip install build twine
+        run: pip install build twine trove-classifiers
 
       - name: Build sdist and wheel
         run: python -m build
 
       - name: twine check
         run: twine check --strict dist/*
+
+      - name: Verify the classifiers exist
+        # twine does not check them against the trove list, and PyPI rejects
+        # the upload at the very end of a release if one is not a real one.
+        run: |
+          python - <<'PY'
+          import pathlib, sys, tomllib
+          from trove_classifiers import classifiers
+          declared = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["classifiers"]
+          unknown = [c for c in declared if c not in classifiers]
+          if unknown:
+              sys.exit(f"not valid PyPI classifiers: {unknown}")
+          print(f"{len(declared)} classifiers are valid")
+          PY
 
       - name: Verify the wheel ships the typing marker and stubs
         run: |
