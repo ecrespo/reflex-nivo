@@ -28,6 +28,15 @@ Fixed before the first publication:
   to charts that do not declare them as nivo callbacks, where they were silently dead. They now
   reach the wrapping `<div>` as DOM events, and an unknown `on_*` raises a `TypeError` listing the
   chart's nivo callbacks.
-- The event serializer no longer writes `null` into arrays when it stops (depth bound raised from 6
-  to 12, and dropped entries are skipped): a hierarchy datum from a drill-down handler can be fed
-  straight back to the chart as `data=` without breaking d3-hierarchy.
+- The event serializer no longer writes `null` into arrays when it stops, and reaches deep enough
+  for real hierarchies (bound raised from 6 to 20 levels, dropped entries skipped): a drill-down
+  datum can be fed straight back to the chart as `data=` without breaking d3-hierarchy.
+- `nivo.tooltip()` no longer renders its template through `dangerouslySetInnerHTML`. Templates may
+  use a fixed set of attribute-less tags (`b`, `strong`, `i`, `em`, `u`, `s`, `small`, `code`,
+  `span`, `div`, `p`, `br`), which become React elements; everything else, including every
+  interpolated value, is rendered as text. A template or a datum built from user input can no
+  longer inject an element or an event handler.
+- Objects that appear more than once in an event payload without being a cycle keep their data
+  instead of disappearing; only a repeat that carries an `id` is replaced by that id, which also
+  cuts a dense sankey link payload from ~175 KB to ~2.5 KB. Cycle detection now tracks the path
+  being walked, and a node budget bounds pathological structures.

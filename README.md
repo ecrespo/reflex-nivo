@@ -179,8 +179,9 @@ nivo accepts functions for labels, formatters, accessors, tooltips and custom la
 # Formatter/label from a {path} template, evaluated in the browser:
 label = nivo.template("{id}: {formattedValue}")
 
-# Tooltip component from an HTML template. Interpolated values are escaped, the container
-# uses the chart theme's tooltip style. The template itself can be a state Var.
+# Tooltip component from a template. It may use attribute-less <b>, <strong>, <i>, <em>, <u>,
+# <s>, <small>, <code>, <span>, <div>, <p> and <br>; anything else, and every interpolated
+# value, is rendered as text, so template and values are safe to build from a state Var.
 tooltip = nivo.tooltip("<b>{datum.label}</b><br/>{datum.formattedValue}", style={"min_width": "120px"})
 
 # Anything else: a raw JavaScript expression (never build it from user input).
