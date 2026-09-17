@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Choropleth(NivoComponent):
     @classmethod
     def create(
@@ -105,7 +108,7 @@ class Choropleth(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Choropleth":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -261,7 +264,7 @@ class ChoroplethCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "ChoroplethCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -410,7 +413,7 @@ class GeoMap(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "GeoMap":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -552,7 +555,7 @@ class GeoMapCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "GeoMapCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

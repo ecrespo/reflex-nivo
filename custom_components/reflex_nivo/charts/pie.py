@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Literal
 from reflex.event import EventHandler
 from reflex.vars.base import Var
 
-from ..base import NivoComponent, nivo_event_spec
+from ..base import NivoComponent, nivo_event_spec, nivo_id_event_spec
 from ..constants import nivo_package
 
 
@@ -136,7 +136,7 @@ class Pie(NivoComponent):
     value_format: Var[Any]
 
     # Events: the handler receives the JSON-safe first callback argument.
-    on_active_id_change: EventHandler[nivo_event_spec]
+    on_active_id_change: EventHandler[nivo_id_event_spec]
     on_click: EventHandler[nivo_event_spec]
     on_mouse_enter: EventHandler[nivo_event_spec]
     on_mouse_leave: EventHandler[nivo_event_spec]
@@ -253,7 +253,7 @@ class PieCanvas(NivoComponent):
     value_format: Var[Any]
 
     # Events: the handler receives the JSON-safe first callback argument.
-    on_active_id_change: EventHandler[nivo_event_spec]
+    on_active_id_change: EventHandler[nivo_id_event_spec]
     on_click: EventHandler[nivo_event_spec]
     on_mouse_move: EventHandler[nivo_event_spec]
     on_resize: EventHandler[nivo_event_spec]

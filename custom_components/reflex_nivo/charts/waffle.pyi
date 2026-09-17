@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Waffle(NivoComponent):
     @classmethod
     def create(
@@ -82,7 +85,7 @@ class Waffle(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Waffle":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -217,7 +220,7 @@ class WaffleCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "WaffleCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -349,7 +352,7 @@ class WaffleHtml(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "WaffleHtml":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

@@ -15,15 +15,15 @@ from __future__ import annotations
 import json
 import keyword
 import re
+import shutil
+import subprocess  # nosec B404 - dev-time script running a fixed command
+import sys
 from pathlib import Path
+
+import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "custom_components" / "reflex_nivo" / "charts"
-
-# npm package -> python module name.
-PACKAGES: dict[str, str] = {
-    "area-bump": "bump",  # AreaBump lives in @nivo/bump (handled via EXPORT_PACKAGE)
-}
 
 # Python factory names for classes whose snake_case would be awkward.
 FACTORY_NAMES: dict[str, str] = {
@@ -136,8 +136,28 @@ DEFAULT_PROPS: dict[str, dict] = {
 # Props never exposed.
 SKIP = {"ref", "key", "children", "width", "height", "style"}
 
+# Props a component declares but never reads, so exposing them would give the
+# user a handler that cannot fire or an option that does nothing. Checked
+# against the nivo bundle named next to each entry; @nivo/geo ships its own
+# (wrong) typings, which is why every entry here is a geo one.
+#
+# nivo-geo.mjs destructures: GeoMap -> onClick; GeoMapCanvas -> onClick,
+# onMouseMove; Choropleth -> onClick, defs, fill, legends; ChoroplethCanvas ->
+# onClick, onMouseMove, legends. None of the four reads onResize.
+UNREAD: dict[str, set[str]] = {
+    "ResponsiveGeoMap": {"onMouseEnter", "onMouseMove", "onMouseLeave", "defs", "fill", "legends"},
+    "ResponsiveGeoMapCanvas": {"onMouseEnter", "onMouseLeave", "defs", "fill", "legends"},
+    "ResponsiveChoropleth": {"onMouseEnter", "onMouseMove", "onMouseLeave"},
+    "ResponsiveChoroplethCanvas": {"onMouseEnter", "onMouseLeave", "defs", "fill"},
+}
+
 # nivo prop -> python-safe camelCase name (mirrored by NivoComponent._rename_props).
 RENAME = {"id": "idBy", "from": "fromDate", "to": "toDate"}
+
+# Callbacks whose first argument is not an object. nivo types onActiveIdChange
+# as `(id: DatumId | null) => void`; every other callback passes a datum, node,
+# cell, point or feature.
+SCALAR_EVENTS = {"onActiveIdChange"}
 
 NAMED_TYPES = {
     "string": "str",
@@ -260,6 +280,49 @@ def parse_prop(entry: str) -> tuple[str, bool, str]:
     return name.rstrip("?").strip(), optional, ts_type.strip()
 
 
+# `create()` returns the wrapping <div>, not the chart, on every component.
+_STUB_RETURN = re.compile(r'^(\s*\)\s*->\s*)"[A-Za-z_]\w*"(:\s*)$', re.MULTILINE)
+_COMPONENT_IMPORT = "from reflex.components.component import Component"
+
+
+def _ruff() -> list[str] | None:
+    """The pinned ruff, so regenerated stubs match what CI checks.
+
+    Returns:
+        The command to run ruff with, or None when it is not available.
+    """
+    pinned = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    spec = next(dep for dep in pinned["optional-dependencies"]["lint"] if dep.startswith("ruff"))
+    if shutil.which("uvx"):
+        return ["uvx", spec.replace("==", "@")]
+    return ["ruff"] if shutil.which("ruff") else None
+
+
+def regenerate_stubs() -> None:
+    """Rewrite the .pyi stubs for the freshly generated modules.
+
+    Reflex's stub generator types ``create()`` as returning the chart class;
+    every factory actually returns the container it is wrapped in.
+    """
+    from reflex_base.utils.pyi_generator import PyiGenerator
+
+    package = OUT_DIR.parent
+    PyiGenerator().scan_all([str(package)])
+
+    for stub in sorted(package.rglob("*.pyi")):
+        text, count = _STUB_RETURN.subn(r"\1Component\2", stub.read_text())
+        if count and _COMPONENT_IMPORT not in text:
+            text = text.replace("\nclass ", f"\n{_COMPONENT_IMPORT}\n\n\nclass ", 1)
+        stub.write_text(text)
+
+    ruff = _ruff()
+    if ruff is None:
+        print("warning: ruff not found, stubs left unformatted", file=sys.stderr)
+        return
+    # nosec B603 - the command is ruff, pinned in pyproject.toml; no user input.
+    subprocess.run([*ruff, "format", str(package)], check=True, capture_output=True)  # nosec B603
+
+
 def main() -> None:
     specs = json.loads((ROOT / "scripts" / "nivo_props.json").read_text())
     specs.update(json.loads((ROOT / "scripts" / "nivo_manual_props.json").read_text()))
@@ -288,7 +351,7 @@ def main() -> None:
             "from reflex.event import EventHandler",
             "from reflex.vars.base import Var",
             "",
-            "from ..base import NivoComponent, nivo_event_spec",
+            "from ..base import NivoComponent, nivo_event_spec, nivo_id_event_spec",
             "from ..constants import nivo_package",
             "",
         ]
@@ -317,7 +380,7 @@ def main() -> None:
             events: list[str] = []
             for entry in sorted(props, key=lambda e: parse_prop(e)[0]):
                 name, optional, ts_type = parse_prop(entry)
-                if name in SKIP or name in seen:
+                if name in SKIP or name in seen or name in UNREAD.get(export, ()):
                     continue
                 seen.add(name)
                 py_camel = RENAME.get(name, name)
@@ -325,7 +388,8 @@ def main() -> None:
                 if to_camel(attr) != py_camel or keyword.iskeyword(attr):
                     raise SystemExit(f"cannot map prop {name!r} of {export}")
                 if re.fullmatch(r"on[A-Z]\w*", name):
-                    events.append(f"    {attr}: EventHandler[nivo_event_spec]")
+                    spec = "nivo_id_event_spec" if name in SCALAR_EVENTS else "nivo_event_spec"
+                    events.append(f"    {attr}: EventHandler[{spec}]")
                     continue
                 doc = PROP_DOCS.get(py_camel)
                 required = "" if optional else " (required)"
@@ -353,6 +417,8 @@ def main() -> None:
     init += ["]", ""]
     (OUT_DIR / "__init__.py").write_text("\n".join(init))
     print(f"generated {len(all_exports)} components in {len(by_package)} modules")
+    regenerate_stubs()
+    print("regenerated the .pyi stubs")
 
 
 if __name__ == "__main__":

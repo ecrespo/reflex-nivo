@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.1 — 2026-09-17
+
+Fixes found reviewing the wrappers against the nivo bundles.
+
+- **@nivo/geo**: the wrappers no longer expose what nivo never reads. `GeoMap` offered
+  `on_mouse_enter`/`on_mouse_move`/`on_mouse_leave`, `GeoMapCanvas` and `ChoroplethCanvas` offered
+  enter/leave and `Choropleth` all three, none of which nivo calls — ten handlers that could never
+  fire. `defs`, `fill` and `legends` are gone from `GeoMap`/`GeoMapCanvas`, and `defs`/`fill` from
+  `ChoroplethCanvas`, for the same reason. What nivo does read (`Choropleth`'s `defs`/`fill`/
+  `legends`, `ChoroplethCanvas`'s `legends`, `on_mouse_move` on both canvas variants) is untouched.
+  A handler for one of the removed callbacks now lands on the container, where it does fire.
+- **`on_active_id_change`** (Pie, PieCanvas) declares the id it receives instead of a datum dict; it
+  is the only nivo callback whose first argument is not an object.
+- **Calendar dates from state** get the same local-midnight treatment as literal ones. Only plain
+  `YYYY-MM-DD` strings written in the page were normalized, so `from_date=State.start` still shifted
+  a day (and a year) west of Greenwich.
+- **`key`** goes to the container, the element that is actually the list item in `rx.foreach`.
+- **The auto theme is injected once per page** instead of being serialized into every chart: a
+  chart's props go from ~4.4 KB to ~230 bytes, a ten-chart page from ~43 KB to ~2.3 KB.
+- **Templates**: a value the serializer drops (a DOM node, a React event) interpolates as empty text
+  instead of the literal `undefined`, and the template cache is bounded at 256 entries, so a
+  template driven by a state Var no longer grows it without end.
+- **Stubs**: `create()` is typed as returning `Component`, which is what every factory returns — the
+  stubs promised the chart class. `scripts/generate_components.py` now regenerates them, and CI
+  fails if the generated wrappers or stubs drift from the generator.
+
 ## 0.1.0 — 2026-09-17
 
 First release.

@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class ParallelCoordinates(NivoComponent):
     @classmethod
     def create(
@@ -103,7 +106,7 @@ class ParallelCoordinates(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "ParallelCoordinates":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -256,7 +259,7 @@ class ParallelCoordinatesCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "ParallelCoordinatesCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

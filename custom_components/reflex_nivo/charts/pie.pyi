@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class Pie(NivoComponent):
     @classmethod
     def create(
@@ -127,7 +130,7 @@ class Pie(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Pie":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -303,7 +306,7 @@ class PieCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "PieCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

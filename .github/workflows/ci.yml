@@ -57,6 +57,33 @@ jobs:
       - name: pytest
         run: pytest -q
 
+  generated:
+    name: Generated code is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the package and ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . ruff==0.16.8
+
+      - name: Regenerate the wrappers and the stubs
+        run: python scripts/generate_components.py
+
+      - name: Fail if anything changed
+        run: |
+          if ! git diff --quiet; then
+            echo "::error::charts/ is out of sync with scripts/generate_components.py"
+            git diff --stat
+            exit 1
+          fi
+          echo "charts/ matches the generator"
+
   build:
     name: Build & check distribution
     runs-on: ubuntu-latest

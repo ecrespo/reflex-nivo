@@ -33,9 +33,10 @@ class _State(rx.State):
         self.last = datum
 
 
-def _chart_js(index: int) -> str:
-    """The injected JavaScript helper block at `index` (serializer, templates)."""
-    return NivoComponent.add_custom_code(nivo.sunburst(data=[]).children[0])[index]
+def _chart_js(declares: str) -> str:
+    """The injected JavaScript block declaring `declares`."""
+    blocks = NivoComponent.add_custom_code(nivo.sunburst(data=[]).children[0])
+    return next(block for block in blocks if f"const {declares}" in block)
 
 
 def _run_node(script: str) -> dict[str, Any]:
@@ -147,7 +148,7 @@ def test_unknown_event_names_the_available_callbacks():
 def test_serializer_keeps_hierarchy_datums_usable():
     """A drill-down datum must survive as valid `data=` for the chart."""
     out = _run_node(
-        _chart_js(0)
+        _chart_js("reflexNivoSerialize")
         + """
         const nest = (levels) => {
             let tree = {name: "leaf", loc: 1};
@@ -175,7 +176,7 @@ def test_serializer_keeps_hierarchy_datums_usable():
 def test_serializer_keeps_shared_objects_and_shrinks_graphs():
     """A repeat is data, not a hole: only id-bearing ones shrink to the id."""
     out = _run_node(
-        _chart_js(0)
+        _chart_js("reflexNivoSerialize")
         + """
         const shared = {label: "X"};
         const identified = {id: "n1", label: "N"};
@@ -199,8 +200,8 @@ def test_serializer_keeps_shared_objects_and_shrinks_graphs():
 def test_tooltip_templates_cannot_inject_markup():
     """Neither the template nor an interpolated value may become an element."""
     out = _run_node(
-        _chart_js(0)
-        + _chart_js(1)
+        _chart_js("reflexNivoSerialize")
+        + _chart_js("reflexNivoTooltip")
         + """
         const reflexNivoCreateElement = (tag, props, ...children) => ({tag, children});
         const reflexNivoUseTheme = () => ({tooltip: {container: {}}});
@@ -256,3 +257,10 @@ def test_theme_merge():
     assert merged["text"]["fontSize"] == 20
     assert merged["text"]["fill"] == nivo.themes.LIGHT["text"]["fill"]
     assert nivo.themes.LIGHT["text"]["fontSize"] == 11
+
+
+def test_key_goes_to_the_outer_element():
+    """In rx.foreach the React key must be on the list item, the container."""
+    container = nivo.bar(data=[], key="row-1")
+    assert "row-1" in str(container)
+    assert "row-1" not in str(_chart(container))

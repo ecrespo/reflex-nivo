@@ -78,7 +78,14 @@ const reflexNivoSerialize = (value, depth = 0, path = new WeakSet(), budget = { 
 # from the object nivo passes (datum, point, node, cell...).
 _TEMPLATE_JS = r"""
 const reflexNivoGet = (obj, path) => path.split(".").reduce((acc, key) => (acc === null || acc === undefined ? undefined : acc[key]), obj);
-const reflexNivoValue = (raw) => raw === null || raw === undefined ? "" : (typeof raw === "object" ? JSON.stringify(reflexNivoSerialize(raw)) : String(raw));
+const reflexNivoValue = (raw) => {
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw !== "object") return String(raw);
+  // A DOM node, a React event or anything else the serializer drops comes back
+  // undefined, and JSON.stringify(undefined) is undefined, not a string.
+  const serialized = reflexNivoSerialize(raw);
+  return serialized === undefined ? "" : JSON.stringify(serialized);
+};
 const reflexNivoFormat = (template, source) => String(template).replace(/\{\s*([\w$.]+)\s*\}/g, (_, path) => reflexNivoValue(reflexNivoGet(source, path)));
 // Markup a tooltip template may use. Only these tags, and only without
 // attributes: anything else stays literal text, so neither the template nor an
@@ -136,16 +143,23 @@ const reflexNivoRender = (nodes, prefix) => nodes.map((node, index) => {
     : reflexNivoCreateElement(node.tag, { key });
 });
 const reflexNivoTemplateCache = new Map();
-const reflexNivoTemplate = (template) => {
-  const cacheKey = "template:" + template;
-  if (!reflexNivoTemplateCache.has(cacheKey)) {
-    reflexNivoTemplateCache.set(cacheKey, (source) => reflexNivoFormat(template, source));
+// A template built from a state Var is a new key on every change, so the cache
+// is bounded: the oldest entries go first (Map iterates in insertion order).
+const reflexNivoTemplateCacheMax = 256;
+const reflexNivoRemember = (key, build) => {
+  if (!reflexNivoTemplateCache.has(key)) {
+    if (reflexNivoTemplateCache.size >= reflexNivoTemplateCacheMax) {
+      reflexNivoTemplateCache.delete(reflexNivoTemplateCache.keys().next().value);
+    }
+    reflexNivoTemplateCache.set(key, build());
   }
-  return reflexNivoTemplateCache.get(cacheKey);
+  return reflexNivoTemplateCache.get(key);
 };
+const reflexNivoTemplate = (template) =>
+  reflexNivoRemember("template:" + template, () => (source) => reflexNivoFormat(template, source));
 const reflexNivoTooltip = (template, style) => {
   const cacheKey = "tooltip:" + template + "::" + JSON.stringify(style || {});
-  if (!reflexNivoTemplateCache.has(cacheKey)) {
+  return reflexNivoRemember(cacheKey, () => {
     const NivoTemplateTooltip = (props) => {
       const theme = reflexNivoUseTheme();
       const container = (theme && theme.tooltip && theme.tooltip.container) || {};
@@ -156,10 +170,18 @@ const reflexNivoTooltip = (template, style) => {
         ...reflexNivoRender(reflexNivoParse(marked, values), "t")
       );
     };
-    reflexNivoTemplateCache.set(cacheKey, NivoTemplateTooltip);
-  }
-  return reflexNivoTemplateCache.get(cacheKey);
+    return NivoTemplateTooltip;
+  });
 };
+"""
+
+
+# nivo does `new Date("2025-01-01")`, which JS parses as UTC midnight: west of
+# Greenwich that is the previous day (and year). A plain date is sent as local
+# midnight instead. The same rule has to run in the browser for dates that come
+# from state, where the value is only known there.
+_DATE_JS = r"""
+const reflexNivoDate = (value) => (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value + "T00:00:00" : value);
 """
 
 
@@ -179,13 +201,28 @@ def nivo_event_spec(datum: Var[Any]) -> tuple[Var[dict[str, Any]]]:
     return (Var(_js_expr=f"reflexNivoSerialize({datum!s})", _var_type=dict[str, Any]),)
 
 
+def nivo_id_event_spec(value: Var[Any]) -> tuple[Var[str | int | None]]:
+    """Event spec for the callbacks whose first argument is an id.
+
+    ``onActiveIdChange`` is the only nivo callback that does not hand over an
+    object: it passes the active datum id, or null once nothing is active.
+
+    Args:
+        value: The first argument of the nivo callback.
+
+    Returns:
+        A one-element tuple with the id.
+    """
+    return (Var(_js_expr=f"reflexNivoSerialize({value!s})", _var_type=str | int | None),)
+
+
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 # An explicit None prop: nivo must receive null, not nothing at all.
 _JS_NULL = Var(_js_expr="null", _var_type=None)
 
 # Non-CSS props forwarded to the wrapping <div>.
-_CONTAINER_PROPS = frozenset({"id", "class_name", "style", "title", "tab_index"})
+_CONTAINER_PROPS = frozenset({"id", "class_name", "style", "title", "tab_index", "key"})
 
 
 def _style_shorthands() -> frozenset[str]:
@@ -265,7 +302,12 @@ class NivoComponent(Component):
         Returns:
             The custom code blocks (deduplicated per page by Reflex).
         """
-        return [_SERIALIZE_JS.strip(), _TEMPLATE_JS.strip()]
+        return [
+            themes.js_constants(),
+            _SERIALIZE_JS.strip(),
+            _TEMPLATE_JS.strip(),
+            _DATE_JS.strip(),
+        ]
 
     @classmethod
     def _nivo_event_names(cls) -> set[str]:
@@ -291,7 +333,7 @@ class NivoComponent(Component):
     @classmethod
     def _chart_prop_names(cls) -> set[str]:
         names = set(cls.get_props()) | cls._nivo_event_names()
-        return names | {"key", "custom_attrs", "special_props"}
+        return names | {"custom_attrs", "special_props"}
 
     @classmethod
     def _is_container_prop(cls, name: str) -> bool:
@@ -346,6 +388,13 @@ class NivoComponent(Component):
             value = chart_props.get(name)
             if isinstance(value, str) and _ISO_DATE.fullmatch(value):
                 chart_props[name] = f"{value}T00:00:00"
+            elif isinstance(value, Var):
+                # The value is only known in the browser, so normalize it there.
+                chart_props[name] = Var(
+                    _js_expr=f"reflexNivoDate({value!s})",
+                    _var_type=str,
+                    _var_data=value._get_all_var_data(),
+                )
 
         for name, value in cls._default_props.items():
             chart_props.setdefault(name, value)
@@ -371,4 +420,4 @@ class NivoComponent(Component):
         return rx.el.div(chart, **container_props)
 
 
-__all__ = ["NivoComponent", "nivo_event_spec"]
+__all__ = ["NivoComponent", "nivo_event_spec", "nivo_id_event_spec"]

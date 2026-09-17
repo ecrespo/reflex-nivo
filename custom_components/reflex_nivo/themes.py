@@ -9,6 +9,7 @@ light and dark variant with :func:`reflex.color_mode_cond`.
 from __future__ import annotations
 
 import copy
+import json
 from typing import Any
 
 import reflex as rx
@@ -143,6 +144,10 @@ def merge(base: dict[str, Any], overrides: dict[str, Any] | None) -> dict[str, A
     return result
 
 
+_LIGHT_CONST = "reflexNivoLightTheme"
+_DARK_CONST = "reflexNivoDarkTheme"
+
+
 def auto(
     overrides: dict[str, Any] | None = None,
     *,
@@ -159,9 +164,25 @@ def auto(
     Returns:
         A Var evaluating to the light or dark theme depending on color mode.
     """
+    if overrides is None and light is None and dark is None:
+        # The common case: point at the literals injected once per page rather
+        # than serializing both themes into every chart's props.
+        return rx.color_mode_cond(
+            light=Var(_js_expr=_LIGHT_CONST, _var_type=dict),
+            dark=Var(_js_expr=_DARK_CONST, _var_type=dict),
+        )
     light_theme = merge(merge(LIGHT, overrides), light)
     dark_theme = merge(merge(DARK, overrides), dark)
     return rx.color_mode_cond(light=light_theme, dark=dark_theme)
 
 
-__all__ = ["DARK", "LIGHT", "auto", "merge"]
+def js_constants() -> str:
+    """The shared theme literals, injected once per page.
+
+    Returns:
+        A JavaScript snippet declaring the light and dark theme constants.
+    """
+    return f"const {_LIGHT_CONST} = {json.dumps(LIGHT)};\nconst {_DARK_CONST} = {json.dumps(DARK)};"
+
+
+__all__ = ["DARK", "LIGHT", "auto", "js_constants", "merge"]

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reflex-nivo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Every nivo chart (bar, line, pie, sankey, treemap, choropleth... 51 components) as a Reflex component."
 readme = "README.md"
 license = "MIT"

@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class AreaBump(NivoComponent):
     @classmethod
     def create(
@@ -87,7 +90,7 @@ class AreaBump(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "AreaBump":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -245,7 +248,7 @@ class Bump(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "Bump":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:

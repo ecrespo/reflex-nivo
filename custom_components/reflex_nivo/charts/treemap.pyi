@@ -13,6 +13,9 @@ from reflex_base.event import (
 from reflex_base.vars.base import Var
 from ..base import NivoComponent
 
+from reflex.components.component import Component
+
+
 class TreeMap(NivoComponent):
     @classmethod
     def create(
@@ -93,7 +96,7 @@ class TreeMap(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "TreeMap":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -241,7 +244,7 @@ class TreeMapCanvas(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "TreeMapCanvas":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
@@ -389,7 +392,7 @@ class TreeMapHtml(NivoComponent):
         on_scroll_end: Optional[EventType[()]] = None,
         on_unmount: Optional[EventType[()]] = None,
         **props,
-    ) -> "TreeMapHtml":
+    ) -> Component:
         """Create the chart wrapped in a sized container.
 
         Args:
