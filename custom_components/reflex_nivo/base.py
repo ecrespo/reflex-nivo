@@ -114,6 +114,25 @@ _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _CONTAINER_PROPS = frozenset({"id", "class_name", "style", "title", "tab_index"})
 
 
+def _style_shorthands() -> frozenset[str]:
+    """Reflex's own style shorthands (``margin_x``, ``bg``...).
+
+    They are not CSS property names, so ``CSS_PROPERTIES`` does not list them,
+    but they are valid on any Reflex component and must reach the container.
+
+    Returns:
+        The snake_case shorthand names supported by the installed Reflex.
+    """
+    try:
+        from reflex_base.style import STYLE_PROP_SHORTHAND_MAPPING
+    except ImportError:  # pragma: no cover - older/newer Reflex layout
+        return frozenset({"bg", "bg_color", "margin_x", "margin_y", "padding_x", "padding_y"})
+    return frozenset(re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower() for name in STYLE_PROP_SHORTHAND_MAPPING)
+
+
+_STYLE_SHORTHANDS = _style_shorthands()
+
+
 class NivoComponent(Component):
     """Base for every nivo chart.
 
@@ -171,7 +190,7 @@ class NivoComponent(Component):
 
     @classmethod
     def _is_container_prop(cls, name: str) -> bool:
-        if name in _CONTAINER_PROPS or name in CSS_PROPERTIES:
+        if name in _CONTAINER_PROPS or name in CSS_PROPERTIES or name in _STYLE_SHORTHANDS:
             return True
         # Reflex pseudo selectors (_hover, _dark...) and responsive/aria/data attrs.
         return name.startswith(("_", "aria_", "data_", "on_"))

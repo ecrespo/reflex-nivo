@@ -79,6 +79,16 @@ def test_container_props_and_typo_detection():
         nivo.line(data=[], enable_gridx=True)
 
 
+@pytest.mark.parametrize("shorthand", ["margin_x", "margin_y", "padding_x", "padding_y", "bg", "bg_color"])
+def test_reflex_style_shorthands_reach_the_container(shorthand):
+    # They are not CSS property names, so they must be allowed explicitly.
+    assert nivo.pie(data=[], **{shorthand: "auto"}) is not None
+
+
+def test_readme_sizing_example():
+    assert nivo.pie(data=[], height="320px", max_width="600px", margin_x="auto") is not None
+
+
 def test_explicit_theme_is_kept():
     rendered = str(nivo.pie(data=[], theme=nivo.themes.DARK))
     assert "resolvedColorMode" not in rendered

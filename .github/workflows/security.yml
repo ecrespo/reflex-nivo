@@ -91,13 +91,6 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@v3
 
-  dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/dependency-review-action@v5
-        with:
-          fail-on-severity: high
+  # A `dependency-review` job would also fit here, but it needs the repository's
+  # Dependency graph (Settings -> Advanced Security), which is off for this repo.
+  # pip-audit above already flags vulnerable dependencies on every PR.
