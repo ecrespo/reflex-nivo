@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import shutil
+import subprocess
 from typing import Any
 
 import pytest
@@ -20,6 +23,10 @@ CLASSES = [
 class _State(rx.State):
     rows: list[dict[str, Any]] = []
     last: dict[str, Any] = {}
+
+    @rx.event
+    def noop(self):
+        pass
 
     @rx.event
     def clicked(self, datum: dict[str, Any]):
@@ -87,6 +94,66 @@ def test_reflex_style_shorthands_reach_the_container(shorthand):
 
 def test_readme_sizing_example():
     assert nivo.pie(data=[], height="320px", max_width="600px", margin_x="auto") is not None
+
+
+def test_explicit_none_hides_a_prop():
+    # Reflex drops None props, so nivo would apply its own `axisBottom = {}`.
+    rendered = str(nivo.bar(data=[], axis_bottom=None, axis_left=None))
+    assert "axisBottom:null" in rendered
+    assert "axisLeft:null" in rendered
+
+
+def test_explicit_none_theme_means_nivos_own_theme():
+    assert "theme:null" in str(nivo.pie(data=[], theme=None))
+    assert "resolvedColorMode" in str(nivo.pie(data=[]))  # omitted -> auto
+
+
+def test_events_nivo_does_not_declare_go_to_the_container():
+    # @nivo/stream reads no onClick, so the handler must land on the <div>
+    # instead of being swallowed by a component that ignores it.
+    assert "on_click" not in nivo.Stream._nivo_event_names()
+    container = nivo.stream(data=[], on_click=_State.noop)
+    assert "onClick" in str(container)
+    assert "onClick" not in str(_chart(container))
+
+
+def test_nivo_events_still_reach_the_chart_with_the_datum():
+    assert "on_click" in nivo.Bar._nivo_event_names()
+    assert "reflexNivoSerialize" in str(_chart(nivo.bar(data=[], on_click=_State.clicked)))
+
+
+def test_unknown_event_names_the_available_callbacks():
+    with pytest.raises(TypeError, match="nivo callbacks on this chart: on_click"):
+        nivo.sankey(data=[], on_arc_click=_State.clicked)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_serializer_keeps_hierarchy_datums_usable():
+    """A drill-down datum must survive as valid `data=` for the chart."""
+    script = (
+        NivoComponent.add_custom_code(nivo.sunburst(data=[]).children[0])[0]
+        + """
+        let tree = {name: "leaf", loc: 1};
+        for (let i = 0; i < 20; i++) tree = {name: "n" + i, children: [tree]};
+        const cyclic = {id: "a"};
+        cyclic.parent = cyclic;
+        console.log(JSON.stringify({
+            deep: reflexNivoSerialize({data: tree}),
+            cyclic: reflexNivoSerialize(cyclic),
+        }));
+        """
+    )
+    out = json.loads(
+        subprocess.run(
+            [shutil.which("node"), "--input-type=module", "-e", script],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+    # No null child anywhere: d3-hierarchy cannot read one.
+    assert "null" not in json.dumps(out["deep"])
+    assert out["cyclic"] == {"id": "a", "parent": "a"}
 
 
 def test_explicit_theme_is_kept():
