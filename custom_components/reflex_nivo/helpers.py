@@ -113,9 +113,13 @@ def tooltip(text: str | Var[str], style: Mapping[str, Any] | None = None) -> Var
     - Calendar/TimeRange: ``{day}``, ``{value}``
     - Choropleth/GeoMap: ``{feature.label}``, ``{feature.formattedValue}``
 
-    Interpolated values are HTML-escaped; the template itself may contain
-    markup such as ``<strong>``. The container uses the chart theme's tooltip
-    style, extended by ``style``.
+    The template may use these tags, and only without attributes: ``b``,
+    ``strong``, ``i``, ``em``, ``u``, ``s``, ``small``, ``code``, ``span``,
+    ``div``, ``p`` and ``br``. They become React elements; anything else stays
+    literal text, and interpolated values are always text. Neither the
+    template nor a value can inject an element or an event handler, so both
+    are safe to build from a state Var. The container uses the chart theme's
+    tooltip style, extended by ``style``.
 
     Args:
         text: The template (may be a Var).

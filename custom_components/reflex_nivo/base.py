@@ -30,7 +30,7 @@ from .constants import nivo_package
 # the hierarchy datums (tree, sunburst, icicle...) that drill-down handlers
 # send straight back to a chart.
 _SERIALIZE_JS = r"""
-const reflexNivoSerialize = (value, depth = 0, seen = new WeakSet()) => {
+const reflexNivoSerialize = (value, depth = 0, path = new WeakSet(), budget = { left: 20000 }, seen = new WeakSet()) => {
   if (value === null || value === undefined) return null;
   const kind = typeof value;
   if (kind === "number") return Number.isFinite(value) ? value : null;
@@ -41,25 +41,35 @@ const reflexNivoSerialize = (value, depth = 0, seen = new WeakSet()) => {
   if (typeof Node !== "undefined" && value instanceof Node) return undefined;
   if (typeof Event !== "undefined" && value instanceof Event) return undefined;
   if (value.nativeEvent !== undefined && value.currentTarget !== undefined) return undefined;
-  if (seen.has(value)) return value.id !== undefined ? reflexNivoSerialize(value.id, depth, seen) : undefined;
-  if (depth > 12) return undefined;
+  // `path` holds this value's ancestors, so a real cycle (a hierarchy node's
+  // `parent`, a sankey link's endpoints) collapses to the id.
+  if (path.has(value)) return value.id !== undefined ? reflexNivoSerialize(value.id, depth, path, budget, seen) : undefined;
+  // An object that merely appears again in another branch keeps its data: it
+  // is replaced by its id only when it has one, which keeps graph payloads
+  // (sankey/network nodes) small without ever dropping a value outright.
+  if (seen.has(value) && value.id !== undefined) return reflexNivoSerialize(value.id, depth, path, budget, seen);
+  if (depth > 20) return undefined;
+  if (budget.left-- <= 0) return undefined;
+  path.add(value);
   seen.add(value);
+  let result;
   if (Array.isArray(value)) {
     // Dropped entries (too deep, cyclic, a DOM node...) are skipped rather
     // than turned into nulls: a hierarchy datum sent back to a chart as
     // `data=` must not contain a null child, which d3-hierarchy cannot read.
-    const items = [];
+    result = [];
     for (const item of value.slice(0, 2000)) {
-      const serialized = reflexNivoSerialize(item, depth + 1, seen);
-      if (serialized !== undefined) items.push(serialized);
+      const serialized = reflexNivoSerialize(item, depth + 1, path, budget, seen);
+      if (serialized !== undefined) result.push(serialized);
     }
-    return items;
+  } else {
+    result = {};
+    for (const key of Object.keys(value)) {
+      const serialized = reflexNivoSerialize(value[key], depth + 1, path, budget, seen);
+      if (serialized !== undefined) result[key] = serialized;
+    }
   }
-  const result = {};
-  for (const key of Object.keys(value)) {
-    const serialized = reflexNivoSerialize(value[key], depth + 1, seen);
-    if (serialized !== undefined) result[key] = serialized;
-  }
+  path.delete(value);
   return result;
 };
 """
@@ -68,17 +78,68 @@ const reflexNivoSerialize = (value, depth = 0, seen = new WeakSet()) => {
 # from the object nivo passes (datum, point, node, cell...).
 _TEMPLATE_JS = r"""
 const reflexNivoGet = (obj, path) => path.split(".").reduce((acc, key) => (acc === null || acc === undefined ? undefined : acc[key]), obj);
-const reflexNivoEscape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const reflexNivoFormat = (template, source, escape) => String(template).replace(/\{\s*([\w$.]+)\s*\}/g, (_, path) => {
-  const raw = reflexNivoGet(source, path);
-  const text = raw === null || raw === undefined ? "" : (typeof raw === "object" ? JSON.stringify(reflexNivoSerialize(raw)) : String(raw));
-  return escape ? reflexNivoEscape(text) : text;
+const reflexNivoValue = (raw) => raw === null || raw === undefined ? "" : (typeof raw === "object" ? JSON.stringify(reflexNivoSerialize(raw)) : String(raw));
+const reflexNivoFormat = (template, source) => String(template).replace(/\{\s*([\w$.]+)\s*\}/g, (_, path) => reflexNivoValue(reflexNivoGet(source, path)));
+// Markup a tooltip template may use. Only these tags, and only without
+// attributes: anything else stays literal text, so neither the template nor an
+// interpolated value can inject an element or an event handler.
+const reflexNivoTooltipTags = new Set(["b", "strong", "i", "em", "u", "s", "small", "code", "span", "div", "p", "br"]);
+// Split "{path}" placeholders out of the template before the markup is parsed,
+// so a value can never be read as markup. Values come back as React text.
+const reflexNivoSplit = (template, source) => {
+  const values = [];
+  const marked = String(template).replace(/\{\s*([\w$.]+)\s*\}/g, (_, path) => {
+    values.push(reflexNivoValue(reflexNivoGet(source, path)));
+    return "\u0000" + (values.length - 1) + "\u0000";
+  });
+  return { marked, values };
+};
+const reflexNivoText = (text, values, out) => {
+  const parts = text.split(/\u0000(\d+)\u0000/);
+  for (let i = 0; i < parts.length; i++) {
+    const part = i % 2 === 0 ? parts[i] : values[Number(parts[i])];
+    if (part) out.push(part);
+  }
+};
+const reflexNivoParse = (marked, values) => {
+  const root = { children: [] };
+  const stack = [root];
+  // Matches only attribute-less tags; `<img src=x onerror=...>` never matches.
+  const tagPattern = /<\s*(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)\s*(\/?)\s*>/g;
+  let last = 0;
+  let match;
+  while ((match = tagPattern.exec(marked)) !== null) {
+    const [full, closing, name, selfClosing] = match;
+    const tag = name.toLowerCase();
+    reflexNivoText(marked.slice(last, match.index), values, stack[stack.length - 1].children);
+    last = tagPattern.lastIndex;
+    if (!reflexNivoTooltipTags.has(tag)) {
+      stack[stack.length - 1].children.push(full);
+    } else if (closing) {
+      if (stack.length > 1 && stack[stack.length - 1].tag === tag) stack.pop();
+    } else if (selfClosing || tag === "br") {
+      stack[stack.length - 1].children.push({ tag, children: [] });
+    } else {
+      const node = { tag, children: [] };
+      stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    }
+  }
+  reflexNivoText(marked.slice(last), values, stack[stack.length - 1].children);
+  return root.children;
+};
+const reflexNivoRender = (nodes, prefix) => nodes.map((node, index) => {
+  if (typeof node === "string") return node;
+  const key = prefix + index;
+  return node.children.length
+    ? reflexNivoCreateElement(node.tag, { key }, ...reflexNivoRender(node.children, key + "."))
+    : reflexNivoCreateElement(node.tag, { key });
 });
 const reflexNivoTemplateCache = new Map();
 const reflexNivoTemplate = (template) => {
   const cacheKey = "template:" + template;
   if (!reflexNivoTemplateCache.has(cacheKey)) {
-    reflexNivoTemplateCache.set(cacheKey, (source) => reflexNivoFormat(template, source, false));
+    reflexNivoTemplateCache.set(cacheKey, (source) => reflexNivoFormat(template, source));
   }
   return reflexNivoTemplateCache.get(cacheKey);
 };
@@ -88,10 +149,12 @@ const reflexNivoTooltip = (template, style) => {
     const NivoTemplateTooltip = (props) => {
       const theme = reflexNivoUseTheme();
       const container = (theme && theme.tooltip && theme.tooltip.container) || {};
-      return reflexNivoCreateElement("div", {
-        style: { ...container, whiteSpace: "pre", ...(style || {}) },
-        dangerouslySetInnerHTML: { __html: reflexNivoFormat(template, props, true) },
-      });
+      const { marked, values } = reflexNivoSplit(template, props);
+      return reflexNivoCreateElement(
+        "div",
+        { style: { ...container, whiteSpace: "pre", ...(style || {}) } },
+        ...reflexNivoRender(reflexNivoParse(marked, values), "t")
+      );
     };
     reflexNivoTemplateCache.set(cacheKey, NivoTemplateTooltip);
   }

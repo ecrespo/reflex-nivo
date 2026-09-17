@@ -33,6 +33,22 @@ class _State(rx.State):
         self.last = datum
 
 
+def _chart_js(index: int) -> str:
+    """The injected JavaScript helper block at `index` (serializer, templates)."""
+    return NivoComponent.add_custom_code(nivo.sunburst(data=[]).children[0])[index]
+
+
+def _run_node(script: str) -> dict[str, Any]:
+    """Run `script` under node and parse what it prints."""
+    result = subprocess.run(
+        [shutil.which("node"), "--input-type=module", "-e", script],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
 def _chart(container: rx.Component) -> rx.Component:
     return container.children[0]
 
@@ -130,30 +146,81 @@ def test_unknown_event_names_the_available_callbacks():
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_serializer_keeps_hierarchy_datums_usable():
     """A drill-down datum must survive as valid `data=` for the chart."""
-    script = (
-        NivoComponent.add_custom_code(nivo.sunburst(data=[]).children[0])[0]
+    out = _run_node(
+        _chart_js(0)
         + """
-        let tree = {name: "leaf", loc: 1};
-        for (let i = 0; i < 20; i++) tree = {name: "n" + i, children: [tree]};
-        const cyclic = {id: "a"};
+        const nest = (levels) => {
+            let tree = {name: "leaf", loc: 1};
+            for (let i = 0; i < levels; i++) tree = {name: "n" + i, children: [tree, {name: "x" + i}]};
+            return tree;
+        };
+        console.log(JSON.stringify({
+            typical: reflexNivoSerialize({data: nest(8)}),
+            pathological: reflexNivoSerialize({data: nest(40)}),
+        }));
+        """
+    )
+    # A realistic drill-down datum survives whole, leaf included.
+    assert "leaf" in json.dumps(out["typical"])
+    # Deeper than the bound it degrades to an empty `children`, never to a null
+    # child: d3-hierarchy cannot read one.
+    assert "null" not in json.dumps(out["pathological"])
+    deepest = out["pathological"]["data"]
+    while deepest.get("children"):
+        deepest = deepest["children"][0]
+    assert deepest["children"] == []
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_serializer_keeps_shared_objects_and_shrinks_graphs():
+    """A repeat is data, not a hole: only id-bearing ones shrink to the id."""
+    out = _run_node(
+        _chart_js(0)
+        + """
+        const shared = {label: "X"};
+        const identified = {id: "n1", label: "N"};
+        const cyclic = {id: "c"};
         cyclic.parent = cyclic;
         console.log(JSON.stringify({
-            deep: reflexNivoSerialize({data: tree}),
+            shared: reflexNivoSerialize({a: shared, b: shared}),
+            identified: reflexNivoSerialize({a: identified, b: identified}),
             cyclic: reflexNivoSerialize(cyclic),
         }));
         """
     )
-    out = json.loads(
-        subprocess.run(
-            [shutil.which("node"), "--input-type=module", "-e", script],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
+    # Used to lose key "b" entirely when the object carried no id.
+    assert out["shared"] == {"a": {"label": "X"}, "b": {"label": "X"}}
+    # With an id, the repeat still collapses, which keeps graph payloads small.
+    assert out["identified"] == {"a": {"id": "n1", "label": "N"}, "b": "n1"}
+    assert out["cyclic"] == {"id": "c", "parent": "c"}
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_tooltip_templates_cannot_inject_markup():
+    """Neither the template nor an interpolated value may become an element."""
+    out = _run_node(
+        _chart_js(0)
+        + _chart_js(1)
+        + """
+        const reflexNivoCreateElement = (tag, props, ...children) => ({tag, children});
+        const reflexNivoUseTheme = () => ({tooltip: {container: {}}});
+        const render = (template, props) => reflexNivoTooltip(template, {})(props);
+        console.log(JSON.stringify({
+            allowed: render("<b>{id}</b><br/>{v}", {id: "x", v: 3}),
+            valueWithScript: render("<b>{id}</b>", {id: "<script>alert(1)</script>"}),
+            templateWithImg: render("<img src=x onerror=alert(1)>{id}", {id: "ok"}),
+            templateWithHandler: render("<span onclick=alert(1)>{id}</span>", {id: "ok"}),
+        }));
+        """
     )
-    # No null child anywhere: d3-hierarchy cannot read one.
-    assert "null" not in json.dumps(out["deep"])
-    assert out["cyclic"] == {"id": "a", "parent": "a"}
+    # Whitelisted, attribute-less tags become real elements.
+    assert out["allowed"]["children"][0] == {"tag": "b", "children": ["x"]}
+    assert out["allowed"]["children"][1]["tag"] == "br"
+    # A value is always a text child, never markup.
+    assert out["valueWithScript"]["children"][0]["children"] == ["<script>alert(1)</script>"]
+    # A tag carrying attributes stays literal text: no element, no handler.
+    for case in ("templateWithImg", "templateWithHandler"):
+        assert all(isinstance(child, str) for child in out[case]["children"]), out[case]
 
 
 def test_explicit_theme_is_kept():
