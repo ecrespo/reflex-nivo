@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import functools
 import re
 from typing import Any, ClassVar, Literal
 
@@ -25,7 +26,9 @@ from .constants import nivo_package
 # serialization, so every event payload goes through this sanitizer before
 # being sent to the Reflex backend. Repeated/cyclic objects are replaced by
 # their `id` (or dropped), functions and DOM nodes are removed, Dates become
-# ISO strings and the recursion depth is bounded.
+# ISO strings and the recursion depth is bounded. The bound is deep enough for
+# the hierarchy datums (tree, sunburst, icicle...) that drill-down handlers
+# send straight back to a chart.
 _SERIALIZE_JS = r"""
 const reflexNivoSerialize = (value, depth = 0, seen = new WeakSet()) => {
   if (value === null || value === undefined) return null;
@@ -39,13 +42,18 @@ const reflexNivoSerialize = (value, depth = 0, seen = new WeakSet()) => {
   if (typeof Event !== "undefined" && value instanceof Event) return undefined;
   if (value.nativeEvent !== undefined && value.currentTarget !== undefined) return undefined;
   if (seen.has(value)) return value.id !== undefined ? reflexNivoSerialize(value.id, depth, seen) : undefined;
-  if (depth > 6) return undefined;
+  if (depth > 12) return undefined;
   seen.add(value);
   if (Array.isArray(value)) {
-    return value.slice(0, 2000).map((item) => {
+    // Dropped entries (too deep, cyclic, a DOM node...) are skipped rather
+    // than turned into nulls: a hierarchy datum sent back to a chart as
+    // `data=` must not contain a null child, which d3-hierarchy cannot read.
+    const items = [];
+    for (const item of value.slice(0, 2000)) {
       const serialized = reflexNivoSerialize(item, depth + 1, seen);
-      return serialized === undefined ? null : serialized;
-    });
+      if (serialized !== undefined) items.push(serialized);
+    }
+    return items;
   }
   const result = {};
   for (const key of Object.keys(value)) {
@@ -110,6 +118,9 @@ def nivo_event_spec(datum: Var[Any]) -> tuple[Var[dict[str, Any]]]:
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
+# An explicit None prop: nivo must receive null, not nothing at all.
+_JS_NULL = Var(_js_expr="null", _var_type=None)
+
 # Non-CSS props forwarded to the wrapping <div>.
 _CONTAINER_PROPS = frozenset({"id", "class_name", "style", "title", "tab_index"})
 
@@ -131,6 +142,16 @@ def _style_shorthands() -> frozenset[str]:
 
 
 _STYLE_SHORTHANDS = _style_shorthands()
+
+
+@functools.lru_cache(maxsize=1)
+def _container_event_names() -> frozenset[str]:
+    """The DOM events the wrapping ``<div>`` accepts.
+
+    Returns:
+        The container's ``on_*`` trigger names.
+    """
+    return frozenset(type(rx.el.div()).get_event_triggers())
 
 
 class NivoComponent(Component):
@@ -184,16 +205,40 @@ class NivoComponent(Component):
         return [_SERIALIZE_JS.strip(), _TEMPLATE_JS.strip()]
 
     @classmethod
+    def _nivo_event_names(cls) -> set[str]:
+        """The nivo callbacks this chart declares.
+
+        ``get_event_triggers()`` also reports the triggers every Reflex
+        component inherits (``on_click``, ``on_mouse_move``...). nivo never
+        reads those, so a chart that does not declare them must let them
+        through to the wrapping ``<div>`` instead of swallowing them.
+
+        Returns:
+            The ``on_*`` names declared by the chart classes themselves.
+        """
+        names: set[str] = set()
+        for klass in cls.__mro__:
+            if klass is NivoComponent:
+                break
+            for name, annotation in vars(klass).get("__annotations__", {}).items():
+                if name.startswith("on_") and "EventHandler" in str(annotation):
+                    names.add(name)
+        return names
+
+    @classmethod
     def _chart_prop_names(cls) -> set[str]:
-        names = set(cls.get_props()) | set(cls.get_event_triggers())
+        names = set(cls.get_props()) | cls._nivo_event_names()
         return names | {"key", "custom_attrs", "special_props"}
 
     @classmethod
     def _is_container_prop(cls, name: str) -> bool:
         if name in _CONTAINER_PROPS or name in CSS_PROPERTIES or name in _STYLE_SHORTHANDS:
             return True
+        if name.startswith("on_"):
+            # A DOM event on the container: it fires for the whole chart area.
+            return name in _container_event_names()
         # Reflex pseudo selectors (_hover, _dark...) and responsive/aria/data attrs.
-        return name.startswith(("_", "aria_", "data_", "on_"))
+        return name.startswith(("_", "aria_", "data_"))
 
     @classmethod
     def create(cls, *children: Any, **props: Any) -> Component:  # type: ignore[override]
@@ -215,12 +260,20 @@ class NivoComponent(Component):
             elif cls._is_container_prop(name):
                 container_props[name] = value
             else:
-                suggestion = difflib.get_close_matches(name, sorted(chart_names), n=1)
+                candidates = sorted(cls._nivo_event_names() if name.startswith("on_") else chart_names)
+                suggestion = difflib.get_close_matches(name, candidates, n=1)
                 hint = f" Did you mean {suggestion[0]!r}?" if suggestion else ""
-                msg = (
-                    f"{cls.__name__} got an unexpected prop {name!r}: it is neither a "
-                    f"nivo prop of {cls.tag} nor a CSS property for the container.{hint}"
-                )
+                if name.startswith("on_"):
+                    msg = (
+                        f"{cls.__name__} got an unexpected event {name!r}: {cls.tag} has no such "
+                        f"nivo callback and the container does not fire it either. "
+                        f"nivo callbacks on this chart: {', '.join(candidates) or 'none'}.{hint}"
+                    )
+                else:
+                    msg = (
+                        f"{cls.__name__} got an unexpected prop {name!r}: it is neither a "
+                        f"nivo prop of {cls.tag} nor a CSS property for the container.{hint}"
+                    )
                 raise TypeError(msg)
 
         # nivo does `new Date("2025-01-01")`, which JS parses as UTC midnight:
@@ -235,8 +288,17 @@ class NivoComponent(Component):
             chart_props.setdefault(name, value)
 
         # Follow Reflex's light/dark mode unless the caller provided a theme.
-        if "theme" in chart_names and chart_props.get("theme") is None:
+        # An explicit `theme=None` means nivo's own theme, like any other prop.
+        if "theme" in chart_names and "theme" not in chart_props:
             chart_props["theme"] = themes.auto()
+
+        # Reflex drops props whose value is None, which would leave nivo
+        # applying its own default (`axisBottom = {}`) instead of hiding the
+        # axis. An explicit None is what the docs call "None to hide", so it
+        # travels as JavaScript null: React defaults only fill in `undefined`.
+        for name, value in chart_props.items():
+            if value is None:
+                chart_props[name] = _JS_NULL
 
         container_props.setdefault("width", cls._default_width)
         container_props.setdefault("height", cls._default_height)

@@ -130,8 +130,24 @@ class State(rx.State):
 nivo.sunburst(data=State.sunburst, id_by="name", value="loc", on_click=State.drill_down)
 ```
 
-`on_mouse_move` fires very often; prefer click/enter/leave or throttle it:
-`on_mouse_move=State.hover.throttle(100)`.
+Only the callbacks a chart actually declares carry a datum, and they differ per chart: `@nivo/bar`
+exposes `on_click`, `on_mouse_enter` and `on_mouse_leave`, while `@nivo/stream` exposes none of them.
+Any other `on_*` is attached to the wrapping `<div>` as a plain DOM event, so it fires for the whole
+chart area but receives no datum (write the handler without arguments). An `on_*` that is neither
+raises a `TypeError` listing the chart's nivo callbacks.
+
+`on_mouse_move` fires very often; on the charts that expose it, prefer click/enter/leave or throttle
+it: `on_mouse_move=State.hover.throttle(100)`.
+
+### Hiding a prop
+
+Passing `None` sends JavaScript `null`, which turns the feature off instead of falling back to nivo's
+default — that is how you hide an axis:
+
+```python
+nivo.bar(data=State.rows, axis_bottom=None, axis_left=None)  # no axes
+nivo.pie(data=State.pie, theme=None)  # nivo's own theme instead of the Reflex one
+```
 
 ## Helpers
 
