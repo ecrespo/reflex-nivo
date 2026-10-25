@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 — 2026-10-24
+
+Moves to the latest Reflex.
+
+- **Requires Reflex 0.10** (`reflex>=0.10.0`) and, with it, **Python 3.11+**: Python 3.10 is no longer
+  supported. Stay on `reflex-nivo` 0.1.x for Reflex 0.9 / Python 3.10. The components, props and event
+  payloads are unchanged; the wrappers and stubs regenerate identically under Reflex 0.10.
+- The demo app requires `reflex>=0.10.0` and builds for production with it.
+- Build backend requires `setuptools>=78.1.1`.
+- CI: tests run on Python 3.11–3.13, a new job builds the demo frontend on Node 24, every workflow forces
+  JavaScript actions onto Node 24 and CodeQL moves to `github/codeql-action@v4` (the v3 action still
+  ran on Node 20).
+
 ## 0.1.1 — 2026-09-17
 
 Fixes found reviewing the wrappers against the nivo bundles.

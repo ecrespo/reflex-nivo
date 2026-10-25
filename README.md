@@ -15,6 +15,8 @@ Every chart of [nivo](https://nivo.rocks) — the React data-visualization libra
 pip install reflex-nivo
 ```
 
+Requires Python 3.11+ and Reflex 0.10+ (`reflex-nivo` 0.1.x is the line for Reflex 0.9 and Python 3.10).
+
 ## Quick start
 
 ```python
@@ -245,6 +247,22 @@ uv pip install -e ".[dev]"
 uv run pytest
 uv run reflex component build     # generates .pyi stubs, then sdist + wheel in dist/
 ```
+
+CI (`.github/workflows/ci.yml`) runs ruff, the tests on Python 3.11–3.13, the generator drift check, the
+distribution checks and a production build of the demo on Node 24.
+
+## Releasing
+
+1. Bump `version` in `pyproject.toml` and `__version__` in `custom_components/reflex_nivo/__init__.py`,
+   and add a `## X.Y.Z — date` section to `CHANGELOG.md`.
+2. Merge into `main`, then tag the merge commit and push the tag:
+   ```bash
+   git checkout main && git pull
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+3. `.github/workflows/release.yml` checks that the tag matches the version, builds the sdist and wheel,
+   publishes them to PyPI through trusted publishing (the `pypi` environment) and creates the GitHub
+   release with the changelog section as notes.
 
 ## License
 
