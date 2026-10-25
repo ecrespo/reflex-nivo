@@ -18,9 +18,8 @@ import re
 import shutil
 import subprocess  # nosec B404 - dev-time script running a fixed command
 import sys
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "custom_components" / "reflex_nivo" / "charts"

@@ -17,6 +17,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Run every JavaScript action on Node 24, even one that still declares an older runtime.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   bandit:
     name: SAST (bandit)
@@ -83,13 +87,13 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: python
           queries: security-and-quality
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
 
   # A `dependency-review` job would also fit here, but it needs the repository's
   # Dependency graph (Settings -> Advanced Security), which is off for this repo.

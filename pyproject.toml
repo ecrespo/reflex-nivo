@@ -1,25 +1,24 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = ["setuptools>=78.1.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "reflex-nivo"
-version = "0.1.1"
+version = "0.2.0"
 description = "Every nivo chart (bar, line, pie, sankey, treemap, choropleth... 51 components) as a Reflex component."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
 keywords = ["reflex", "reflex-custom-components", "nivo", "d3", "charts", "dataviz", "visualization"]
 
-dependencies = ["reflex>=0.9.0"]
+dependencies = ["reflex>=0.10.0"]
 
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -50,7 +49,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+target-version = "py311"
 extend-exclude = [".web", ".states", "nivo_demo/.web"]
 
 [tool.ruff.format]
