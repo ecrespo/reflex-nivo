@@ -35,7 +35,7 @@ nivo = "https://nivo.rocks"
 
 [project.optional-dependencies]
 dev = ["build", "twine", "pytest"]
-lint = ["ruff==0.16.8"]
+lint = ["ruff==0.17.2"]
 security = ["bandit[toml]==1.9.4", "pip-audit==2.10.1"]
 
 [tool.setuptools.packages.find]
